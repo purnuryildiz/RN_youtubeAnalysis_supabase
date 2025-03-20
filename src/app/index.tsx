@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 
 import { Container } from '~/components/Container';
+import { supabase } from '~/lib/supabase';
 
 const popularChannels = [
   {
@@ -46,13 +47,7 @@ export default function Home() {
     'MrBeast Growth Stats',
     'Veritasium Performance',
   ]);
-
-  const handleAnalyze = () => {
-    if (searchQuery.trim()) {
-      router.push('/channel');
-    }
-  };
-
+  const [url, setUrl] = useState('');
   const animateSearch = (focused: boolean) => {
     Animated.spring(searchAnimation, {
       toValue: focused ? 1 : 0,
@@ -64,6 +59,14 @@ export default function Home() {
     inputRange: [0, 1],
     outputRange: [1, 1.02],
   });
+
+  const startAnalyzing = async () => {
+    const { error, data } = await supabase.functions.invoke('trigger_collection_api', {
+      body: { url },
+    });
+    console.log('error', error);
+    console.log('data', data);
+  };
 
   return (
     <>
@@ -129,8 +132,8 @@ export default function Home() {
                       <TextInput
                         className="flex-1 text-base text-gray-900"
                         placeholder="Enter channel URL or @handle"
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
+                        value={url}
+                        onChangeText={setUrl}
                         onFocus={() => {
                           setIsFocused(true);
                           animateSearch(true);
@@ -166,10 +169,10 @@ export default function Home() {
 
             {/* Analyze Button */}
             <TouchableOpacity
-              onPress={handleAnalyze}
-              disabled={!searchQuery.trim()}
+              onPress={startAnalyzing}
+              disabled={!url.trim()}
               className={`mt-3 overflow-hidden rounded-xl shadow-lg ${
-                searchQuery.trim() ? 'opacity-100' : 'opacity-60'
+                url.trim() ? 'opacity-100' : 'opacity-60'
               }`}
               style={{ elevation: 4 }}>
               <LinearGradient
