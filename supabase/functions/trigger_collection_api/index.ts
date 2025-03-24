@@ -1,34 +1,19 @@
-// Follow this setup guide to integrate the Deno language server with your editor:
-// https://deno.land/manual/getting_started/setup_your_environment
-// This enables autocomplete, go to definition, etc.
-
-// Setup type definitions for built-in Supabase Runtime APIs
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
-
-console.log('Hello from Functions!');
+import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 Deno.serve(async (req) => {
   const { url } = await req.json();
 
-  //curl -H "Authorization: Bearer ea008ef8162289de7f3163bb74c7faac247bff9ea29183c93953a052e5cc086e" -H "Content-Type: application/json" -d '{"deliver":{"type":"s3","filename":{"template":"{[snapshot_id]}","extension":"json"},"bucket":"my-bucket","directory":""},"input":[{"url":"https://www.youtube.com/@MrBeast/about"},{"url":"https://www.youtube.com/@jaidenanimations/about"}]}' "https://api.brightdata.com/datasets/v3/trigger?dataset_id=gd_lk538t2k2p1k3oos71&include_errors=true"include_errors=true"
   console.log('url:', url);
   const response = await fetch(
-    `https://api.brightdata.com/datasets/v3/trigger?dataset_id=gd_lk538t2k2p1k3oos71&include_errors=true`,
+    `https://api.brightdata.com/datasets/v3/trigger?dataset_id=gd_lk538t2k2p1k3oos71&endpoint=${Deno.env.get('SUPABASE_URL')}/functions/v1/collection_webhook2&format=json&uncompressed_webhook=true&include_errors=true`,
     {
       headers: {
         Authorization: `Bearer ${Deno.env.get('BRIGHT_DATA_API_KEY')}`,
         'Content-Type': 'application/json',
       },
       method: 'POST',
-      body: JSON.stringify({
-        deliver: {
-          type: 's3',
-          filename: { template: '{[snapshot_id]}', extension: 'json' },
-          bucket: 'my-bucket',
-          directory: '',
-        },
-        input: [{ url }],
-      }),
+      body: JSON.stringify([{ url }]),
     }
   );
   if (!response.ok) {
@@ -37,6 +22,18 @@ Deno.serve(async (req) => {
     });
   }
   const data = await response.json();
+
+  //store job data in supabase
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+  );
+  const result = await supabase.from('scrape_jobs').insert({
+    id: data.snapshot_id,
+    status: 'running',
+  });
+  console.log('result', result);
 
   return new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
 });
